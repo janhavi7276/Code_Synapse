@@ -1,0 +1,22 @@
+# Environment & API keys (Never commit keys)
+.env
+.env.local
+.env.*
+!.env.example
+
+# Python cache & virtual environments
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+env/
+venv/
+
+# Logs & temp files
+*.log
+local_vector_db.json
+
+# Local ADK runtime state and generated code-search index
+.adk/
+code_synapse/local_code_index.json
+*.evalset.json
