@@ -53,7 +53,7 @@ else:
     model = Gemini(model=gemini_model_id)
 
 # Token limits to prevent verbose loops and keep responses snappy
-ROUTER_CONFIG = types.GenerateContentConfig(temperature=0.0, max_output_tokens=64)
+ROUTER_CONFIG = types.GenerateContentConfig(temperature=0.0, max_output_tokens=256)
 WORKER_CONFIG = types.GenerateContentConfig(temperature=0.2, max_output_tokens=512)
 
 
@@ -87,8 +87,8 @@ searcher = LlmAgent(
     description="Finds where functions, variables, or logic are in the code.",
     instruction=(
         "You are code_searcher. NEVER call transfer_to_agent. "
-        "Use your search_code tool to locate where the code is in the repository, "
-        "and then answer directly and concisely based strictly on the search results."
+        "Call the search_code tool at most ONCE. Do NOT call search_code multiple times. "
+        "Immediately answer the user directly and concisely based strictly on the search results."
     ),
     tools=[search_code],
     generate_content_config=WORKER_CONFIG,
