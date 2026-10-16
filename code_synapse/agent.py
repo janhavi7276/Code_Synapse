@@ -104,8 +104,8 @@ explainer = LlmAgent(
     description="Reads a whole file and explains it using the filesystem MCP server.",
     instruction=(
         "You are code_explainer. NEVER call transfer_to_agent. "
-        "Use the filesystem tools (read_file) or get_file_summary to inspect the requested file, "
-        "and then explain its purpose and functionality clearly and concisely."
+        "Inspect the requested file using read_file or get_file_summary at most ONCE. "
+        "Immediately output a clear, concise explanation of the file."
     ),
     tools=[file_tools, get_file_summary],
     generate_content_config=WORKER_CONFIG,
