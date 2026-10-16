@@ -3,6 +3,75 @@
 Multi-Agent Code Synapse is an intelligent developer assistant built with Google ADK (`google-adk`) that helps software engineers onboard and navigate a codebase. Orchestrated by a coordinator agent and four specialized workers, it provides grounded code search via a custom 5-step RAG pipeline, whole-file explanations through the Model Context Protocol (MCP), and deterministic architecture mapping using Python AST.
 
 
+## System Architecture
+
+```mermaid
+graph TD
+    %% Global Styles & Palette
+    classDef client fill:#1E293B,stroke:#64748B,stroke-width:2px,color:#FFFFFF,font-weight:bold;
+    classDef boss fill:#1E3A8A,stroke:#3B82F6,stroke-width:3px,color:#FFFFFF,font-weight:bold;
+    classDef worker fill:#065F46,stroke:#10B981,stroke-width:2px,color:#FFFFFF,font-weight:bold;
+    classDef ragTool fill:#7C2D12,stroke:#EA580C,stroke-width:2px,color:#FFFFFF;
+    classDef mcpTool fill:#581C87,stroke:#9333EA,stroke-width:2px,color:#FFFFFF;
+    classDef astTool fill:#0C4A6E,stroke:#0284C7,stroke-width:2px,color:#FFFFFF;
+    classDef guideTool fill:#78350F,stroke:#D97706,stroke-width:2px,color:#FFFFFF;
+    classDef infra fill:#0F172A,stroke:#94A3B8,stroke-width:2px,stroke-dasharray: 4 4,color:#F8FAFC;
+
+    %% Client Layer
+    User(["👤 Software Developer"]):::client
+    UI["💻 Google ADK Web UI / Runner<br/><code>http://127.0.0.1:8000</code>"]:::client
+
+    User -->|Prompts & Queries| UI
+    UI -->|Invocations & Sessions| Boss
+
+    %% Coordinator (Boss) Layer
+    subgraph Hub ["🎯 Hub & Routing Layer"]
+        Boss["👑 Coordinator (Boss Agent)<br/><code>code_synapse.agent.root_agent</code><br/><i>Routes queries • Never answers code itself</i>"]:::boss
+    end
+
+    %% Workers Layer
+    subgraph Specialists ["⚡ Specialized Worker Agents (Google ADK & LiteLLM)"]
+        W1["🔍 code_searcher<br/><b>Worker 1</b><br/><i>Semantic code retrieval</i>"]:::worker
+        W2["📖 code_explainer<br/><b>Worker 2</b><br/><i>File & logic synthesis</i>"]:::worker
+        W3["🏗️ architecture_mapper<br/><b>Worker 3</b><br/><i>Dependency & AST analysis</i>"]:::worker
+        W4["🚀 onboarding_guide<br/><b>Worker 4</b><br/><i>Quickstart & walkthroughs</i>"]:::worker
+    end
+
+    Boss -->|"transfer_to_agent<br/>(Where is it?)"| W1
+    Boss -->|"transfer_to_agent<br/>(What does file do?)"| W2
+    Boss -->|"transfer_to_agent<br/>(How files connect?)"| W3
+    Boss -->|"transfer_to_agent<br/>(Where do I start?)"| W4
+
+    %% Tools Layer
+    subgraph Tools ["🛠️ Tools & Engine Layer"]
+        T1["search_code<br/><i>NVIDIA NIM + Pinecone RAG</i>"]:::ragTool
+        T2["Filesystem MCP Server<br/><i>read_file & list_directory</i>"]:::mcpTool
+        T2b["get_file_summary<br/><i>Structural outline</i>"]:::mcpTool
+        T3["map_imports & find_function<br/><i>Deterministic Python AST (NO AI)</i>"]:::astTool
+        T4["list_project_files & quickstart<br/><i>Project guides & metadata</i>"]:::guideTool
+    end
+
+    W1 -->|Calls| T1
+    W2 -->|Calls| T2
+    W2 -->|Calls| T2b
+    W3 -->|Calls| T3
+    W4 -->|Calls| T4
+
+    %% Infrastructure / External Backends
+    subgraph Storage ["💾 External Infrastructure & Codebase Under Study"]
+        DB[("🌲 Pinecone Vector Database<br/><code>code-synapse</code> serverless index<br/>2048 dims • Cosine similarity")]:::infra
+        NIM["⚡ NVIDIA NIM Cloud API<br/><code>nemotron-3-embed-1b</code> (Embeddings)<br/><code>llama-3.2-11b-vision-instruct</code> (Chat)"]:::infra
+        MCP["📂 @modelcontextprotocol/<br/>server-filesystem (npx.CMD)"]:::infra
+        Codebase["🐍 Target Codebase (c:/Naive_RAG)<br/>config.py • indexer.py • vector_store.py<br/>query_pipeline.py • main.py"]:::infra
+    end
+
+    T1 -.->|Dense 2048-d query| DB
+    T1 -.->|Generate embedding| NIM
+    T2 -.->|Stdio JSON-RPC| MCP
+    MCP -.->|Reads workspace| Codebase
+    T3 -.->|Static AST inspect| Codebase
+```
+
 ---
 
 ## 1. Team of Agents
