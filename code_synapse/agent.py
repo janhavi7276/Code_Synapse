@@ -57,6 +57,43 @@ ROUTER_CONFIG = types.GenerateContentConfig(temperature=0.0, max_output_tokens=2
 WORKER_CONFIG = types.GenerateContentConfig(temperature=0.2, max_output_tokens=512)
 
 
+def prevent_tool_loop(callback_context, llm_request):
+    """
+    Prevents open-source LLMs (like Llama 3.2 on NVIDIA NIM) from entering
+    an infinite tool-calling loop that causes context overflow errors (131072 max token limit).
+    Once a tool has been executed in the current turn, strip tools from the request
+    so the model is forced to generate a clean, final text answer.
+    """
+    contents = llm_request.contents or []
+    last_user_prompt_idx = -1
+    for i in range(len(contents) - 1, -1, -1):
+        c = contents[i]
+        if getattr(c, "role", None) == "user":
+            has_text = any(
+                getattr(p, "text", None) and getattr(p, "function_response", None) is None
+                for p in getattr(c, "parts", [])
+            )
+            if has_text:
+                last_user_prompt_idx = i
+                break
+
+    has_fr_in_turn = False
+    start_idx = max(0, last_user_prompt_idx)
+    for c in contents[start_idx:]:
+        for p in getattr(c, "parts", []):
+            if getattr(p, "function_response", None) is not None:
+                has_fr_in_turn = True
+                break
+        if has_fr_in_turn:
+            break
+
+    if has_fr_in_turn:
+        llm_request.tools_dict = {}
+        if llm_request.config:
+            llm_request.config.tools = []
+    return None
+
+
 # =====================================================================
 # PHASE 6: CONNECT FILESYSTEM MCP SERVER (CONNECTED TO CODE EXPLAINER)
 # =====================================================================
@@ -91,6 +128,7 @@ searcher = LlmAgent(
         "Immediately answer the user directly and concisely based strictly on the search results."
     ),
     tools=[search_code],
+    before_model_callback=prevent_tool_loop,
     generate_content_config=WORKER_CONFIG,
 )
 
@@ -104,10 +142,11 @@ explainer = LlmAgent(
     description="Reads a whole file and explains it using the filesystem MCP server.",
     instruction=(
         "You are code_explainer. NEVER call transfer_to_agent. "
-        "Inspect the requested file using read_file or get_file_summary at most ONCE. "
-        "Immediately output a clear, concise explanation of the file."
+        "Use the filesystem tools (read_file) or get_file_summary to inspect the requested file, "
+        "and then explain its purpose and functionality clearly and concisely."
     ),
     tools=[file_tools, get_file_summary],
+    before_model_callback=prevent_tool_loop,
     generate_content_config=WORKER_CONFIG,
 )
 
@@ -125,6 +164,7 @@ mapper = LlmAgent(
         "and answer strictly based on the tool output."
     ),
     tools=[map_imports, find_function],
+    before_model_callback=prevent_tool_loop,
     generate_content_config=WORKER_CONFIG,
 )
 
@@ -142,6 +182,7 @@ guide = LlmAgent(
         "and where to start using list_project_files, get_project_quickstart, or get_project_architecture_overview."
     ),
     tools=[list_project_files, get_project_quickstart, get_project_architecture_overview],
+    before_model_callback=prevent_tool_loop,
     generate_content_config=WORKER_CONFIG,
 )
 

@@ -9,8 +9,17 @@ from pathlib import Path
 
 
 def _get_project_root() -> Path:
-    """Resolve the root folder of the Naive RAG project (c:\\Naive_RAG)."""
+    """Resolve the root folder of the Code Synapse repository."""
     return Path(__file__).resolve().parent.parent.parent
+
+
+def _get_target_codebase_dir() -> Path:
+    """Resolve the target Naive RAG directory (Naive_RAG/ or project root)."""
+    root = _get_project_root()
+    naive_rag = root / "Naive_RAG"
+    if naive_rag.exists():
+        return naive_rag
+    return root
 
 
 def map_imports(file_name: str = "") -> str:
@@ -19,7 +28,7 @@ def map_imports(file_name: str = "") -> str:
     Use this tool when asked about file connections, which files import config.py,
     or the overall dependency graph of the project without AI guessing.
     """
-    root = _get_project_root()
+    root = _get_target_codebase_dir()
     py_files = sorted(root.glob("*.py"))
 
     if not py_files:
@@ -139,7 +148,7 @@ def find_function(function_name: str = "") -> str:
     Use this tool when asked: 'Where is function X defined?', 'Find function X',
     or to list all function definitions across the codebase without AI guessing.
     """
-    root = _get_project_root()
+    root = _get_target_codebase_dir()
     py_files = sorted(root.glob("*.py"))
     clean_query = function_name.strip().lower()
 

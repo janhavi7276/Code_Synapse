@@ -8,8 +8,17 @@ from pathlib import Path
 
 
 def _get_project_root() -> Path:
-    """Resolve the root folder of the Naive RAG project (c:\\Naive_RAG)."""
+    """Resolve the root folder of the Code Synapse project."""
     return Path(__file__).resolve().parent.parent.parent
+
+
+def _get_target_codebase_dir() -> Path:
+    """Resolve the target Naive RAG directory (Naive_RAG/ or project root)."""
+    root = _get_project_root()
+    naive_rag = root / "Naive_RAG"
+    if naive_rag.exists():
+        return naive_rag
+    return root
 
 
 def list_project_files() -> str:
@@ -18,8 +27,8 @@ def list_project_files() -> str:
     Use this tool when asked: 'What files exist in this project?', 'List all files',
     or to explore the project file structure.
     """
-    root = _get_project_root()
-    py_files = sorted(root.glob("*.py"))
+    target_dir = _get_target_codebase_dir()
+    py_files = sorted(target_dir.glob("*.py"))
 
     descriptions = {
         "config.py": "Centralized configuration & API key management (NVIDIA NIM & Pinecone).",
@@ -29,22 +38,23 @@ def list_project_files() -> str:
         "main.py": "Command-line demo runner orchestrating the full lecture walkthrough.",
     }
 
-    output = ["=== PROJECT FILES IN NAIVE RAG REPOSITORY ==="]
+    dir_label = "Naive_RAG/" if target_dir.name == "Naive_RAG" else ""
+    output = [f"=== PROJECT FILES IN NAIVE RAG REPOSITORY ({dir_label}) ==="]
     for pf in py_files:
         name = pf.name
         with open(pf, "r", encoding="utf-8") as f:
             lines = f.readlines()
         size_bytes = pf.stat().st_size
         desc = descriptions.get(name, "Python module.")
-        output.append(f"\n* {name} ({len(lines)} lines, {size_bytes} bytes)")
+        output.append(f"\n* {dir_label}{name} ({len(lines)} lines, {size_bytes} bytes)")
         output.append(f"  Role: {desc}")
 
     # Check for data directory
-    data_dir = root / "data"
+    data_dir = target_dir / "data"
     if data_dir.exists():
-        output.append("\nKnowledge Documents (data/):")
+        output.append(f"\nKnowledge Documents ({dir_label}data/):")
         for df in sorted(data_dir.glob("*.txt")):
-            output.append(f"  - data/{df.name} ({df.stat().st_size} bytes)")
+            output.append(f"  - {dir_label}data/{df.name} ({df.stat().st_size} bytes)")
 
     return "\n".join(output)
 
@@ -55,11 +65,15 @@ def get_file_summary(file_name: str) -> str:
     Use this tool to prepare file information for explanation or when asked:
     'Give me a summary of file X', or to inspect classes/functions in a specific file.
     """
-    root = _get_project_root()
+    target_dir = _get_target_codebase_dir()
     clean_name = file_name.strip()
+    if clean_name.startswith("Naive_RAG/") or clean_name.startswith("Naive_RAG\\"):
+        clean_name = clean_name.replace("Naive_RAG/", "").replace("Naive_RAG\\", "")
     if not clean_name.endswith(".py"):
         clean_name += ".py"
-    target_path = root / clean_name
+    target_path = target_dir / clean_name
+    if not target_path.exists():
+        target_path = _get_project_root() / clean_name
 
     if not target_path.exists():
         return f"I could not find that. File '{file_name}' does not exist in the project."

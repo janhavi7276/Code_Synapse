@@ -30,6 +30,14 @@ def load_env() -> None:
 load_env()
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
+def get_codebase_dir() -> Path:
+    """Returns the directory containing the Naive RAG target codebase."""
+    naive_rag_dir = PROJECT_ROOT / "Naive_RAG"
+    if naive_rag_dir.exists():
+        return naive_rag_dir
+    return PROJECT_ROOT
+
 TARGET_FILES = [
     "config.py",
     "indexer.py",
@@ -43,11 +51,14 @@ LOCAL_CACHE_FILE = Path(__file__).resolve().parent / "local_code_index.json"
 # =====================================================================
 # STEP 1: READ EVERY .PY FILE IN THE CODE PROJECT
 # =====================================================================
-def read_codebase(root: Path = PROJECT_ROOT) -> dict[str, str]:
+def read_codebase(root: Path = None) -> dict[str, str]:
     """Reads each target Python file in the project into memory."""
+    if root is None:
+        root = get_codebase_dir()
     codebase = {}
     print("\n" + "=" * 60)
     print("STEP 1: READING CODEBASE FILES")
+    print(f"Directory: {root}")
     print("=" * 60)
     for fname in TARGET_FILES:
         fpath = root / fname

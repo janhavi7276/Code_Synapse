@@ -74,6 +74,44 @@ graph TD
 
 ---
 
+## 📁 Repository & Folder Structure
+
+The project maintains a clean separation of concerns between the target codebase under analysis and the multi-agent AI framework:
+
+```text
+Code_Synapse/
+│
+├── Naive_RAG/                         # Target Codebase Under Analysis
+│   ├── config.py                      # Centralized configuration & API keys
+│   ├── indexer.py                     # Offline indexing pipeline (NIM + Pinecone)
+│   ├── vector_store.py                # Pinecone client & zero-crash local JSON store
+│   ├── query_pipeline.py              # Query embedding & top-k context prompt pipeline
+│   ├── main.py                        # Command-line lecture demo runner
+│   ├── Day4_Naive_RAG_Walkthrough.ipynb # Interactive tutorial notebook
+│   ├── Day4_Naive_RAG_Project_Build_Spec.md # Complete lecture specification
+│   └── data/                          # Ground-truth source documents
+│       ├── astratech_employee_handbook.txt
+│       └── chronos_operations_manual.txt
+│
+├── code_synapse/                      # Multi-Agent AI Team (Google ADK)
+│   ├── agent.py                       # 1 Boss + 4 Workers + Tool Loop Guard
+│   ├── index_codebase.py              # Custom 5-step RAG indexer (500-char sliding window)
+│   ├── local_code_index.json          # Cached code chunk embeddings
+│   ├── .adk/                          # ADK session & event persistence (SQLite)
+│   └── tools/                         # Modular custom tools
+│       ├── __init__.py
+│       ├── rag_search.py              # Semantic code search via Pinecone & NIM
+│       ├── file_tools.py              # File inventory & structural summaries
+│       └── architecture_tools.py      # AST-based imports & function finder (NO AI)
+│
+├── .env.example                       # Environment configuration template
+├── .gitignore                         # Excludes secrets, virtual environments, and caches
+├── requirements.txt                   # Dependency manifests (ADK, LiteLLM, Pinecone)
+└── README.md                          # Full system documentation & diagrams
+```
+
+---
+
 ## 1. Team of Agents
 
 The system uses a hierarchical architecture with **1 Coordinator (Boss)** and **4 Specialized Workers**:
@@ -215,10 +253,20 @@ adk run code_synapse
 
 ## 7. Problem Encountered & Solution
 
-### Problem:
+### Problem 1: MCP Server Import & Windows Binary Path
 During the integration of the Filesystem MCP server in `google-adk 2.12.0`, importing `McpToolset` from `google.adk.tools.mcp_tool` threw an `ImportError: cannot import name 'McpToolset'`, and subsequent execution failed with `ModuleNotFoundError: No module named 'mcp'`. Additionally, on Windows, executing `command="npx"` in `StdioServerParameters` failed to locate the Windows batch wrapper `npx.cmd`.
 
-### Solution:
+**Solution:**
 1. **Installed the MCP Library:** Added `pip install mcp` to provide the underlying protocol classes (`StdioServerParameters`).
 2. **Corrected the Import Path:** Changed the import to the dedicated module: `from google.adk.tools.mcp_tool.mcp_toolset import McpToolset`.
 3. **Resolved the Windows Binary Path:** Used `shutil.which("npx") or "npx"` so that the full path to `npx.CMD` (`C:\Program Files\nodejs\npx.CMD`) is passed to the process runner, ensuring reliable cross-platform execution on Windows.
+
+---
+
+### Problem 2: Max Context Token Limit Exceeded (`131072 context length exceeded`)
+When worker agents (such as `code_searcher`) were called via LiteLLM with open-source models (`meta/llama-3.2-11b-vision-instruct` on NVIDIA NIM), the model repeatedly re-triggered function calls in an infinite loop instead of synthesizing a final text answer once the tool completed. Because each tool response was appended to the conversation context, the session rapidly accumulated 138,000+ tokens, triggering `litellm.exceptions.ContextWindowExceededError: Nvidia_nimException - This model's maximum context length is 131072 tokens`.
+
+**Solution:**
+1. **Implemented `prevent_tool_loop` Callback Guard:** Added a `before_model_callback` to all four worker agents in `agent.py`. The hook inspects the current turn: as soon as a `function_response` event is recorded for that turn, it dynamically strips the `tools` from the `llm_request`. Without active tools, the model is strictly constrained to output its synthesized text response.
+2. **Compact Search Payloads:** Truncated chunk snippets in `rag_search.py` to a maximum of 400 characters, cutting prompt payload size by over 60%.
+3. **Session Purge:** Cleaned bloated historical session logs in SQLite (`code_synapse/.adk/session.db`) so subsequent interactions start with a fresh, clean context.

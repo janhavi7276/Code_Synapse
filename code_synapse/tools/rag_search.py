@@ -39,8 +39,11 @@ def search_code(query: str) -> str:
 
     for idx, m in enumerate(matches, 1):
         score_pct = round(m["score"] * 100, 1)
+        snippet = m["text"].strip()
+        if len(snippet) > 400:
+            snippet = snippet[:400] + "\n... [truncated]"
         output.append(f"--- [Match #{idx}] File: {m['file']} (Relevance: {score_pct}%, Chunk: {m['id']}) ---")
-        output.append(m["text"])
+        output.append(snippet)
         output.append("")
 
     return "\n".join(output)
